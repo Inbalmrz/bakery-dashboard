@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bakery Sales Dashboard</title>
+<meta name="theme-color" content="#D9822B">
+<style>
+  /* ===== 1. Theme tokens =====
+     Change --primary to the logo's main color and --complement to its opposite
+     on the color wheel (hue + 180 degrees). Everything below uses these. */
+  :root {
+    --primary: #D9822B;       /* crust orange: replace with the logo's main color */
+    --primary-dark: #B56A1D;
+    --complement: #2B88D9;    /* complement: hue + 180 degrees */
+    --bg: #FBF7F2;
+    --card: #FFFFFF;
+    --text: #2E2118;
+    --muted: #7A6A5C;
+    --line: #EBE1D6;
+    --good: #2E9E5B;
+    --bad: #D64545;
+    --radius: 20px;
+  }
+  /* Dark mode: follows the device setting automatically */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1D1610; --card: #2A2019; --text: #F5EBDD; --muted: #B8A793; --line: #3D3026;
+    }
+  }
+  /* ===== 2. Base styles ===== */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    padding-bottom: 96px;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--complement); outline-offset: 2px; }
+
+  /* ===== 3. Header: logo, bakery name, date, and Today/Week/Month switcher ===== */
+  header {
+    background: var(--primary); color: #fff;
+    padding: 16px 16px 20px;
+    border-radius: 0 0 28px 28px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; margin: 0 auto 16px; max-width: 1100px; }
+  .logo { width: 48px; height: 48px; flex: none; }
+  .brand h1 { font-size: 20px; margin: 0; line-height: 1.1; }
+  .brand small { opacity: .9; }
+  .brand .date { margin-inline-start: auto; font-weight: 600; text-align: end; }
+
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 1100px; margin: 0 auto; }
+  .seg button {
+    min-height: 56px; border: 0; border-radius: 16px; font-weight: 700; font-size: 18px;
+    background: rgba(255,255,255,.2); color: #fff;
+  }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--primary-dark); }
+
+  /* ===== 4. Page layout and shared card style ===== */
+  main {
+    max-width: 1100px; margin: 16px auto 0; padding: 0 16px;
+    display: grid; gap: 16px;
+  }
+  /* ===== 5. KPI cards (2x2 on phones, one row on wider screens) ===== */
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+  .card h2 svg { width: 32px; height: 32px; flex: none; }
+  .kpi .icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+               background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary-dark); }
+  .kpi .icon svg { width: 28px; height: 28px; }
+  .kpi .label { color: var(--muted); font-weight: 600; margin-top: 8px; }
+  .kpi .value { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+  .delta { font-weight: 700; font-size: 15px; }
+  .delta.up { color: var(--good); } .delta.down { color: var(--bad); }
+
+  /* ===== 6. Sales bar chart (each bar is a button so it is easy to tap; the best bar uses the complement color) ===== */
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 180px; padding-top: 8px; }
+  .bar { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%;
+         background: none; border: 0; padding: 0; }
+  .bar i { display: block; width: 100%; border-radius: 8px 8px 0 0; background: var(--primary); min-height: 4px; }
+  .bar.peak i { background: var(--complement); }
+  .bar span { font-size: 11px; color: var(--muted); margin-top: 4px; height: 14px; }
+  .tip { min-height: 24px; font-weight: 700; margin-top: 8px; color: var(--complement); }
+
+  /* ===== 7. Top sellers list ===== */
+  .top li { list-style: none; display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center;
+            padding: 10px 0; border-top: 1px solid var(--line); }
+  .top li:first-child { border-top: 0; }
+  .top ul { margin: 0; padding: 0; }
+  .emoji { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 28px;
+           background: color-mix(in srgb, var(--complement) 14%, transparent); }
+  .top .name { font-weight: 700; }
+  .top .sub { color: var(--muted); font-size: 14px; }
+  .top .rev { font-weight: 800; }
+
+  /* ===== 8. Category donut chart and legend ===== */
+  .donut-wrap { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .donut { width: 160px; height: 160px; flex: none; }
+  .legend { display: grid; gap: 8px; flex: 1; min-width: 160px; }
+  .legend div { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .legend b { margin-inline-start: auto; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+
+  /* ===== 9. Sales-by-channel progress bars ===== */
+  .channel { margin-bottom: 14px; }
+  .channel .row { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 6px; }
+  .track { height: 16px; border-radius: 8px; background: var(--line); overflow: hidden; }
+  .track i { display: block; height: 100%; border-radius: 8px; background: var(--primary); }
+  .track.alt i { background: var(--complement); }
+
+  /* ===== 10. Large action buttons (64px tall) ===== */
+  .actions { display: grid; gap: 12px; }
+  .btn { min-height: 64px; border: 0; border-radius: 18px; font-weight: 800; font-size: 18px;
+         display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .btn svg { width: 32px; height: 32px; }
+  .btn.primary { background: var(--primary); color: #fff; }
+  .btn.secondary { background: var(--complement); color: #fff; }
+  .btn:active { transform: scale(.98); }
+
+  /* ===== 11. Bottom navigation bar (thumb-friendly on phones) ===== */
+  nav.tabs {
+    position: fixed; inset-inline: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  nav.tabs button { background: none; border: 0; min-height: 64px; border-radius: 14px; color: var(--muted);
+                    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 700; }
+  nav.tabs svg { width: 32px; height: 32px; }
+  nav.tabs button[aria-current="page"] { color: var(--complement); background: color-mix(in srgb, var(--complement) 12%, transparent); }
+
+  .note { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 0; }
+
+  /* ===== 12. Responsive breakpoints: phone (default), tablet 600px+, desktop 1024px+ ===== */
+  @media (min-width: 600px) {
+    .kpis { grid-template-columns: repeat(4, 1fr); }
+    .actions { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 1024px) {
+    main { grid-template-columns: repeat(3, 1fr); }
+    .kpis, .wide, .actions, .note { grid-column: 1 / -1; }
+    .wide { grid-column: span 2; }
+    nav.tabs { max-width: 560px; margin: 0 auto; inset-inline: 0; border-radius: 20px 20px 0 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER: logo + name + date, and the Today/Week/Month switcher ===== -->
+<header>
+  <div class="brand">
+    <!-- Placeholder logo: replace with the real logo file (e.g. <img src="logo.svg">) -->
+    <svg class="logo" viewBox="0 0 48 48" role="img" aria-label="Bakery logo (placeholder)">
+      <circle cx="24" cy="24" r="23" fill="#fff"/>
+      <path d="M24 9v30M24 15c-4-1-6-4-6-7 4 1 6 4 6 7zm0 0c4-1 6-4 6-7-4 1-6 4-6 7zM24 24c-4-1-6-4-6-7 4 1 6 4 6 7zm0 0c4-1 6-4 6-7-4 1-6 4-6 7zM24 33c-4-1-6-4-6-7 4 1 6 4 6 7zm0 0c4-1 6-4 6-7-4 1-6 4-6 7z"
+            fill="none" stroke="#D9822B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div><h1>Your Bakery</h1><small>Sales dashboard</small></div>
+    <div class="date" id="today"></div>
+  </div>
+  <div class="seg" role="group" aria-label="Date range">
+    <button data-range="today" aria-pressed="true">Today</button>
+    <button data-range="week" aria-pressed="false">Week</button>
+    <button data-range="month" aria-pressed="false">Month</button>
+  </div>
+</header>
+
+<main>
+  <!-- KPI CARDS: filled in by render() in the script below -->
+  <section class="kpis" id="kpis" aria-label="Key numbers"></section>
+
+  <!-- SALES CHART: bars by hour (Today) or by day (Week / Month) -->
+  <section class="card wide">
+    <h2 id="chartTitle"></h2>
+    <div class="bars" id="bars"></div>
+    <div class="tip" id="tip" aria-live="polite">Tap a bar to see its value</div>
+  </section>
+
+  <!-- TOP SELLERS: best-selling products with units and revenue -->
+  <section class="card top">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
+      Top sellers
+    </h2>
+    <ul id="top"></ul>
+  </section>
+
+  <!-- CATEGORY DONUT: share of sales by product category -->
+  <section class="card">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 2v10h10A10 10 0 0 0 11 2zM9 4a9 9 0 1 0 11 11H9z"/></svg>
+      By category
+    </h2>
+    <div class="donut-wrap">
+      <svg class="donut" viewBox="0 0 42 42" id="donut" role="img" aria-label="Sales by category"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <!-- CHANNELS: in-store vs pre-order vs delivery -->
+  <section class="card">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 7H6.2M10 20a1.5 1.5 0 1 0 0-.01zm8 0a1.5 1.5 0 1 0 0-.01z"/></svg>
+      By channel
+    </h2>
+    <div id="channels"></div>
+  </section>
+
+  <!-- ACTIONS: big buttons for the two main tasks -->
+  <section class="actions">
+    <button class="btn primary" id="addSale">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Add sale
+    </button>
+    <button class="btn secondary" id="export">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>
+      Export CSV
+    </button>
+  </section>
+
+  <p class="note">Version 1 · sample data for design review only · replace with POS export</p>
+</main>
+
+<!-- BOTTOM NAV: Today / Week / Month switch the range; Products and Settings are placeholders for later versions -->
+<nav class="tabs" aria-label="Main">
+  <button aria-current="page"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>Today</button>
+  <button><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zM5 9h14v11H5z"/></svg>Week</button>
+  <button><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/></svg>Month</button>
+  <button><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3C7 3 3 6 3 10v2h18v-2c0-4-4-7-9-7zM4 14h16l-1.5 6h-13z"/></svg>Products</button>
+  <button><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 5v-2l-2.3-.7a7 7 0 0 0-.7-1.7l1.2-2.1-1.4-1.4-2.1 1.2a7 7 0 0 0-1.7-.7L13 3h-2l-.7 2.3a7 7 0 0 0-1.7.7L6.5 4.8 5.1 6.2l1.2 2.1a7 7 0 0 0-.7 1.7L3 11v2l2.6.7a7 7 0 0 0 .7 1.7l-1.2 2.1 1.4 1.4 2.1-1.2a7 7 0 0 0 1.7.7L11 21h2l.7-2.3a7 7 0 0 0 1.7-.7l2.1 1.2 1.4-1.4-1.2-2.1a7 7 0 0 0 .7-1.7z"/></svg>Settings</button>
+</nav>
+
+<script>
+(function () {
+  "use strict";
+  // ---------- 1. Sample data (replace with the POS export) ----------
+  // Products (w = relative popularity), categories, and channels are fixed samples;
+  // the hourly/daily sales numbers are generated by build() below.
+  var CURRENCY = "₪"; // shekel sign
+  var products = [
+    { icon: "🍞", name: "Sourdough loaf", price: 28, w: 10 },
+    { icon: "🥐", name: "Butter croissant", price: 14, w: 14 },
+    { icon: "🍰", name: "Cake slice", price: 22, w: 6 },
+    { icon: "🍪", name: "Cookies (box)", price: 30, w: 5 },
+    { icon: "☕", name: "Coffee", price: 12, w: 13 }
+  ];
+  var categories = [
+    { name: "Breads", share: .34, color: "#D9822B" },
+    { name: "Pastries", share: .28, color: "#2B88D9" },
+    { name: "Cakes", share: .17, color: "#8A5A2B" },
+    { name: "Drinks", share: .15, color: "#7FB6E8" },
+    { name: "Other", share: .06, color: "#C9B8A6" }
+  ];
+  var channels = [
+    { name: "In-store", share: .62 },
+    { name: "Pre-order", share: .24 },
+    { name: "Delivery", share: .14 }
+  ];
+  // Repeatable pseudo-random number (0..1), so the sample data looks the same on every load
+  function rnd(seed) { var x = Math.sin(seed * 9301 + 49297) * 233280; return x - Math.floor(x); }
+
+  // Builds the sales series for "today" (hourly), "week" (daily) or "month" (daily),
+  // plus the totals and the previous-period total used for the % change
+  function build(range) {
+    var labels, vals, orders, prevTotal;
+    if (range === "today") {
+      labels = []; vals = [];
+      for (var h = 6; h <= 19; h++) {
+        labels.push(String(h));
+        var shape = h < 8 ? 0.7 : h < 11 ? 1.6 : h < 14 ? 1.1 : h < 17 ? 0.9 : 0.5;
+        vals.push(Math.round(180 * shape * (0.7 + rnd(h))));
+      }
+      orders = 118; prevTotal = sum(vals) * 0.93;
+    } else if (range === "week") {
+      labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      vals = labels.map(function (_, i) { return Math.round((1500 + rnd(i + 20) * 1100) * (i === 5 ? 1.5 : 1)); });
+      orders = 790; prevTotal = sum(vals) * 1.04;
+    } else {
+      labels = []; vals = [];
+      for (var d = 1; d <= 30; d++) {
+        labels.push(d % 5 === 0 || d === 1 ? String(d) : "");
+        vals.push(Math.round(1400 + rnd(d + 50) * 1500));
+      }
+      orders = 3480; prevTotal = sum(vals) * 0.97;
+    }
+    var total = sum(vals);
+    return { labels: labels, vals: vals, total: total, orders: orders, prev: prevTotal };
+  }
+  function sum(a) { return a.reduce(function (s, v) { return s + v; }, 0); }
+  function money(n) { return CURRENCY + Math.round(n).toLocaleString("en-US"); }
+
+  // ---------- 2. Rendering ----------
+  // KPI card icons (SVG paths) and the helper that builds one KPI card
+  var ICONS = {
+    cash: '<path d="M3 6h18v12H3zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>',
+    bag: '<path d="M6 7h12l1 14H5zM9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2"/>',
+    basket: '<path d="M3 10h18l-2 10H5zM8 10l3-6M16 10l-3-6"/>',
+    trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  function kpi(icon, label, value, delta) {
+    var d = "";
+    if (delta !== null) {
+      var up = delta >= 0;
+      d = '<div class="delta ' + (up ? "up" : "down") + '">' + (up ? "▲ " : "▼ ") + Math.abs(delta).toFixed(1) + "% vs last period</div>";
+    }
+    return '<div class="card kpi"><div class="icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + ICONS[icon] + '</svg></div>' +
+           '<div class="label">' + label + '</div><div class="value">' + value + "</div>" + d + "</div>";
+  }
+
+  // Redraws the whole dashboard for the chosen range
+  function render(range) {
+    var data = build(range);
+    var change = (data.total - data.prev) / data.prev * 100;
+    var avg = data.total / data.orders;
+    // KPI cards
+    document.getElementById("kpis").innerHTML =
+      kpi("cash", { today: "Today's sales", week: "This week", month: "This month" }[range], money(data.total), change) +
+      kpi("bag", "Orders", data.orders.toLocaleString("en-US"), null) +
+      kpi("basket", "Average basket", money(avg), null) +
+      kpi("trend", "Vs last period", (change >= 0 ? "+" : "") + change.toFixed(1) + "%", null);
+
+    // Bar chart: bar height is relative to the best bar, which is highlighted; tapping a bar shows its value
+    document.getElementById("chartTitle").textContent =
+      { today: "Sales by hour", week: "Sales by day", month: "Sales by day" }[range];
+    var max = Math.max.apply(null, data.vals), peak = data.vals.indexOf(max);
+    var bars = document.getElementById("bars");
+    bars.innerHTML = data.vals.map(function (v, i) {
+      return '<button class="bar' + (i === peak ? " peak" : "") + '" data-i="' + i + '" aria-label="' +
+             (data.labels[i] || i + 1) + ": " + money(v) + '"><i style="height:' + Math.max(3, v / max * 100) + '%"></i><span>' + data.labels[i] + "</span></button>";
+    }).join("");
+    var tip = document.getElementById("tip");
+    tip.textContent = "Best: " + (data.labels[peak] || peak + 1) + " – " + money(max) + " (tap any bar)";
+    bars.onclick = function (e) {
+      var b = e.target.closest(".bar"); if (!b) return;
+      var i = +b.dataset.i;
+      tip.textContent = (data.labels[i] || i + 1) + " – " + money(data.vals[i]);
+    };
+
+    // Top sellers: units are split by each product's popularity weight
+    var wsum = sum(products.map(function (p) { return p.w; }));
+    document.getElementById("top").innerHTML = products.slice().sort(function (a, b) { return b.w - a.w; }).map(function (p) {
+      var units = Math.round(data.orders * 2.2 * p.w / wsum);
+      return '<li><div class="emoji" aria-hidden="true">' + p.icon + '</div><div><div class="name">' + p.name +
+             '</div><div class="sub">' + units + ' units</div></div><div class="rev">' + money(units * p.price) + "</div></li>";
+    }).join("");
+
+    // Category donut: one circle per slice, drawn with stroke-dasharray, plus the legend
+    var off = 0, circ = 2 * Math.PI * 15.915;
+    document.getElementById("donut").innerHTML = '<circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--line)" stroke-width="7"/>' +
+      categories.map(function (c) {
+        var len = c.share * circ;
+        var s = '<circle cx="21" cy="21" r="15.915" fill="none" stroke="' + c.color + '" stroke-width="7" stroke-dasharray="' +
+                len + " " + (circ - len) + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 21 21)"/>';
+        off += len; return s;
+      }).join("");
+    document.getElementById("legend").innerHTML = categories.map(function (c) {
+      return '<div><span class="dot" style="background:' + c.color + '"></span>' + c.name + "<b>" + Math.round(c.share * 100) + "%</b></div>";
+    }).join("");
+
+    // Channels: progress bar per channel with its share of the total
+    document.getElementById("channels").innerHTML = channels.map(function (c, i) {
+      return '<div class="channel"><div class="row"><span>' + c.name + "</span><span>" + money(data.total * c.share) +
+             '</span></div><div class="track' + (i === 1 ? " alt" : "") + '"><i style="width:' + c.share * 100 + '%"></i></div></div>';
+    }).join("");
+  }
+
+  // ---------- 3. Events ----------
+  // Today / Week / Month buttons in the header
+  var segButtons = document.querySelectorAll(".seg button");
+  segButtons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      segButtons.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      render(b.dataset.range);
+    });
+  });
+  // Bottom nav: the first three tabs reuse the header range buttons
+  document.querySelectorAll("nav.tabs button").forEach(function (b, i) {
+    b.addEventListener("click", function () {
+      if (i < 3) segButtons[i].click();
+      document.querySelectorAll("nav.tabs button").forEach(function (x) { x.removeAttribute("aria-current"); });
+      b.setAttribute("aria-current", "page");
+    });
+  });
+  // Add sale is a placeholder; Export downloads the current chart data as a CSV file
+  document.getElementById("addSale").addEventListener("click", function () { alert("Add sale: coming in the next version."); });
+  document.getElementById("export").addEventListener("click", function () {
+    var range = document.querySelector(".seg [aria-pressed=true]").dataset.range, d = build(range);
+    var csv = "label,sales\n" + d.vals.map(function (v, i) { return (d.labels[i] || i + 1) + "," + v; }).join("\n");
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "bakery-sales-" + range + ".csv"; a.click();
+  });
+
+  // ---------- 4. Start: show today's date and draw the "Today" view ----------
+  document.getElementById("today").textContent = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  render("today");
+})();
+</script>
+</body>
+</html>
